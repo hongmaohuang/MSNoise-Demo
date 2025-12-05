@@ -55,7 +55,7 @@ plt.xlim(-maxlag, maxlag)
 plt.legend()
 plt.grid(True, which='both', linestyle='--', alpha=0.5)
 plt.tight_layout()
-plt.show()
+plt.savefig(f"{figs_folder}/CCF_{network}_{station1}_{network}_{station2}.png", dpi=300)
 
 #
 # DVV
