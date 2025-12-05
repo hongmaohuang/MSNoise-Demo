@@ -2,20 +2,28 @@ import obspy
 import os
 from obspy import UTCDateTime
 
-SOURCE_FOLDER = "../Seismic_Data"
-OUTPUT_FOLDER = "SDS"
+from config_loader import load_config
 
 def process_seismic_data():
-    if not os.path.exists(OUTPUT_FOLDER):
-        os.makedirs(OUTPUT_FOLDER)
+    config = load_config()
+    processing_config = config.get("seismic_processing", {})
 
-    print(f"Start processing data from {SOURCE_FOLDER} to {OUTPUT_FOLDER}...")
+    source_folder = processing_config.get("source_folder")
+    output_folder = processing_config.get("output_folder")
 
-    for filename in os.listdir(SOURCE_FOLDER):
+    if not source_folder or not output_folder:
+        raise ValueError("'source_folder' and 'output_folder' must be set in the seismic_processing config section.")
+
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    print(f"Start processing data from {source_folder} to {output_folder}...")
+
+    for filename in os.listdir(source_folder):
         if not filename.endswith(".mseed"):
             continue
 
-        filepath = os.path.join(SOURCE_FOLDER, filename)
+        filepath = os.path.join(source_folder, filename)
         print(f"Processing {filename} ...")
 
         try:
@@ -58,7 +66,7 @@ def process_seismic_data():
                         loc = day_slice.stats.location if day_slice.stats.location else ""
 
 
-                        save_dir = os.path.join(OUTPUT_FOLDER, year_str, net, sta)
+                        save_dir = os.path.join(output_folder, year_str, net, sta)
                         if not os.path.exists(save_dir):
                             os.makedirs(save_dir)
 

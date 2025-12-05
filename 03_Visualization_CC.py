@@ -4,19 +4,30 @@ import numpy as np
 import pandas as pd
 import os
 import glob
+
+from config_loader import load_config
+
 plt.rcParams['font.family'] = 'Nimbus Sans'
 plt.rcParams['font.size'] = 13
 
-cc_files = "./STACKS/01/REF/ZZ"
-dtt_folder = "./DTT/01/005_DAYS/ZZ"
-network = "5J"
-station1 = "02050"
-station2 = "02818"
-overplot_well = "SV-12_PT"
-well_data = f"/media/kmaterna/rocket/hmhuang/Research/Iceland/Well_Data_confidential/{overplot_well}_confidential_data.csv"
-#dvv_target_pair = f"5J_{station1}_5J_{station2}" 
-dvv_target_pair = "ALL"
-figs_folder = "./Figs"
+config = load_config()
+viz_config = config.get("visualization", {})
+
+cc_files = viz_config.get("cc_files")
+dtt_folder = viz_config.get("dtt_folder")
+network = viz_config.get("network")
+station1 = viz_config.get("station1")
+station2 = viz_config.get("station2")
+overplot_well = viz_config.get("overplot_well")
+well_data_root = viz_config.get("well_data_root")
+dvv_target_pair = viz_config.get("dvv_target_pair", "ALL")
+figs_folder = viz_config.get("figs_folder", "./Figs")
+
+if not all([cc_files, dtt_folder, network, station1, station2, overplot_well, well_data_root]):
+    raise ValueError("Visualization config must define cc_files, dtt_folder, network, station1, station2, overplot_well, and well_data_root.")
+
+well_data = os.path.join(well_data_root, f"{overplot_well}_confidential_data.csv")
+
 if not os.path.exists(figs_folder):
     os.makedirs(figs_folder)
 
