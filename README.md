@@ -1,4 +1,4 @@
-# MSNoise Demo Workflow
+# MSNoise Demo Workflow (Revision by OpenAI Codex, also works)
 
 This repository demonstrates a minimal MSNoise processing pipeline for converting raw seismic data into daily MiniSEED files, configuring the MSNoise database, and visualizing cross-correlation and dv/v results. All scripts now share settings through a single `config.json` file at the project root.
 
