@@ -1,0 +1,27 @@
+MSNOISE STEPS
+
+Hong-Mao Huang, Dec 5, 2025
+
+REMEMBER TO MODIFY THE PARAMETERS OF EACH PYTHON CODE!!
+
+1. Get the seismic waveforms, and place them in the Seimic_Data folder.
+
+2. Run 01_seismic_data_formatted_for_MSNoise.py to produce daily waveforms.
+
+3. Please note that seismic stations without N, E, or Z components (such as DAS), the 01 python code will force it to be as Z component automatically. The DAS data works, but other kinds of seismometers haven't been tested yet.
+
+4. Run the command "msnoise db init" in this folder. Select [1] sqlite and no Table prefix (just press the enter key).  
+
+5. Run 02_Data_Scan.py to set up the configuration for MSNoise.
+
+6. Run the command "msnoise new_jobs --init"
+
+7. Run the command "msnoise compute_cc"
+
+8. Run the command "msnoise stack -r and then run "msnoise reset STACK", and finally run "msnoise stack -m"
+
+9. Run the command "msnoise compute_mwcs"
+
+10. Run the command "msnoise compute_dtt"
+
+11. Run 03_Visualization_CC.py
