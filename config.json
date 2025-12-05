@@ -4,7 +4,7 @@
     "output_folder": "SDS"
   },
   "data_scan": {
-    "sds_root": "/media/kmaterna/rocket/hmhuang/Research/Iceland/MSNoise_Demo",
+    "sds_root": "/media/kmaterna/rocket/hmhuang/Research/Iceland/MSNoise-Demo",
     "db_path": "msnoise.sqlite",
     "stations_info": [
       ["5J", "01412", -22.43064, 63.87888, 11.61],
@@ -22,7 +22,7 @@
       "mwcs_step": 4.0
     },
     "global_config": {
-      "data_folder": "/media/kmaterna/rocket/hmhuang/Research/Iceland/MSNoise_Demo",
+      "data_folder": "/media/kmaterna/rocket/hmhuang/Research/Iceland/MSNoise-Demo",
       "data_structure": "SDS",
       "data_type": "D",
       "startdate": "2020-01-01",
