@@ -1,0 +1,46 @@
+{
+  "seismic_processing": {
+    "source_folder": "../Seismic_Data",
+    "output_folder": "SDS"
+  },
+  "data_scan": {
+    "sds_root": "/media/kmaterna/rocket/hmhuang/Research/Iceland/MSNoise_Demo",
+    "db_path": "msnoise.sqlite",
+    "stations_info": [
+      ["5J", "01412", -22.43064, 63.87888, 11.61],
+      ["5J", "02050", -22.47506, 63.86989, 18.78],
+      ["5J", "02818", -22.53514, 63.86642, 40.62]
+    ],
+    "filter_config": {
+      "ref": 1,
+      "low": 0.1,
+      "high": 1.0,
+      "mwcs_low": 0.1,
+      "mwcs_high": 1.0,
+      "rms_threshold": 0.0,
+      "mwcs_wlen": 12.0,
+      "mwcs_step": 4.0
+    },
+    "global_config": {
+      "data_folder": "/media/kmaterna/rocket/hmhuang/Research/Iceland/MSNoise_Demo",
+      "data_structure": "SDS",
+      "data_type": "D",
+      "startdate": "2020-01-01",
+      "enddate": "2021-01-01",
+      "components_to_compute": "ZZ",
+      "channels": "Z",
+      "plugins": "db_init"
+    }
+  },
+  "visualization": {
+    "cc_files": "./STACKS/01/REF/ZZ",
+    "dtt_folder": "./DTT/01/005_DAYS/ZZ",
+    "network": "5J",
+    "station1": "02050",
+    "station2": "02818",
+    "overplot_well": "SV-12_PT",
+    "well_data_root": "/media/kmaterna/rocket/hmhuang/Research/Iceland/Well_Data_confidential",
+    "dvv_target_pair": "ALL",
+    "figs_folder": "./Figs"
+  }
+}

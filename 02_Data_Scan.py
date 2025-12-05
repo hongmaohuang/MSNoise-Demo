@@ -1,26 +1,31 @@
 import os
 import sqlite3
 import obspy
-from datetime import datetime
+
+from config_loader import load_config
+
+config = load_config()
+scan_config = config.get("data_scan", {})
 
 # ================= SETTINGS =================
 # Absolute path to your SDS
-sds_root = "/media/kmaterna/rocket/hmhuang/Research/Iceland/MSNoise_Demo"
-db_path = "msnoise.sqlite"
+sds_root = scan_config.get("sds_root")
+db_path = scan_config.get("db_path")
 
 # Station information (latest coordinates)
-stations_info = [
-    ("5J", "01412", -22.43064, 63.87888, 11.61),
-    ("5J", "02050", -22.47506, 63.86989, 18.78),
-    ("5J", "02818", -22.53514, 63.86642, 40.62)
-]
+stations_info = scan_config.get("stations_info", [])
 
 # Filter configuration (0.1 - 1.0 Hz)
-filter_config = {
-    "ref": 1, "low": 0.1, "high": 1.0, "mwcs_low": 0.1, "mwcs_high": 1.0,
-    "rms_threshold": 0.0, "mwcs_wlen": 12.0, "mwcs_step": 4.0
-}
+filter_config = scan_config.get("filter_config", {})
+global_config = scan_config.get("global_config", {})
 # ============================================
+
+if not sds_root or not db_path:
+    raise ValueError("'sds_root' and 'db_path' must be provided in the data_scan config section.")
+if not stations_info:
+    raise ValueError("'stations_info' must include at least one station in the data_scan config section.")
+if not filter_config:
+    raise ValueError("'filter_config' must be defined in the data_scan config section.")
 
 if not os.path.exists(db_path):
     print("ERROR: msnoise.sqlite not found. Please run 'msnoise db init' first!")
@@ -44,7 +49,7 @@ try:
     # --- 2. Write configuration ---
     print("\n--- [2/4] Writing global configuration ---")
     # Note: Your files are HSF, so you must compute 'FF' components; using ZZ may fail.
-    configs = {
+    configs = global_config if global_config else {
         'data_folder': sds_root,
         'data_structure': 'SDS',
         'data_type': 'D',
@@ -54,6 +59,7 @@ try:
         'channels': 'Z',
         'plugins': 'db_init'
     }
+
     for name, value in configs.items():
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES (?, ?)", (name, value))
     print("Config written (FF components, year 2020).")
