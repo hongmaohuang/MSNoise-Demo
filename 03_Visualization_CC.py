@@ -138,5 +138,3 @@ else:
     plt.grid(True, linestyle='--', alpha=0.5)
     plt.tight_layout()
     plt.savefig(f"./Figs/dv_v_{dvv_target_pair}.png", dpi=300)
-
-# %%
