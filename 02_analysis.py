@@ -10,9 +10,7 @@ from obspy import UTCDateTime
 
 plt.rcParams['font.family'] = 'Nimbus Sans'
 plt.rcParams['font.size'] = 13
-# ================= 設定區 =================
-# 這裡請改成你 STACKS 資料夾裡，某一個配對的路徑
-# 根據你之前的 ls 結果，我幫你填了一個範例，請確認路徑是否存在
+
 PAIR_FOLDER = "STACKS/01/005_DAYS/ZZ/5J_02050_5J_02818" 
 MAX_LAG_TIME = 60.0  # 畫圖範圍：只畫 -60秒 到 60秒
 NORMALIZE = True     # 是否將每天的波形振幅歸一化 (建議 True，不然地震天會整條爆掉)
