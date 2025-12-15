@@ -1,7 +1,7 @@
 {
   "search_criteria": {
-    "start_date": "2021-03-18",
-    "end_date": "2021-07-31",
+    "start_date": "2021-01-01",
+    "end_date": "2021-12-31",
     "region": {
       "min_lat": 63.8078,
       "max_lat": 63.9936,
@@ -17,23 +17,95 @@
   "data_scan": {
     "sds_root": "/media/kmaterna/rocket/hmhuang/Research/Iceland/MSNoise-Demo", 
     "db_path": "msnoise.sqlite",
-    "filter_config": {
-      "ref": 1,
-      "low": 0.1,
-      "high": 1.0,
-      "mwcs_low": 0.1,
-      "mwcs_high": 1.0,
-      "rms_threshold": 0.0,
-      "mwcs_wlen": 12.0,
-      "mwcs_step": 4.0
-    }
+    "filter_config": [
+      {
+        "ref": 1,
+        "low": 0.1,
+        "high": 0.3,
+        "mwcs_low": 0.1,
+        "mwcs_high": 0.3,
+        "rms_threshold": 0.0,
+        "mwcs_wlen": 12.0,
+        "mwcs_step": 4.0
+      },
+      {
+        "ref": 2,
+        "low": 0.3,
+        "high": 0.5,
+        "mwcs_low": 0.3,
+        "mwcs_high": 0.5,
+        "rms_threshold": 0.0,
+        "mwcs_wlen": 12.0,
+        "mwcs_step": 4.0
+      },
+      {
+        "ref": 3,
+        "low": 0.5,
+        "high": 0.8,
+        "mwcs_low": 0.5,
+        "mwcs_high": 0.8,
+        "rms_threshold": 0.0,
+        "mwcs_wlen": 12.0,
+        "mwcs_step": 4.0
+      },
+      {
+        "ref": 4,
+        "low": 0.8,
+        "high": 1.0,
+        "mwcs_low": 0.8,
+        "mwcs_high": 1.0,
+        "rms_threshold": 0.0,
+        "mwcs_wlen": 12.0,
+        "mwcs_step": 4.0
+      },
+      {
+        "ref": 5,
+        "low": 1.0,
+        "high": 2.0,
+        "mwcs_low": 1.0,
+        "mwcs_high": 2.0,
+        "rms_threshold": 0.0,
+        "mwcs_wlen": 12.0,
+        "mwcs_step": 4.0
+      },
+      {
+        "ref": 6,
+        "low": 2.0,
+        "high": 4.0,
+        "mwcs_low": 2.0,
+        "mwcs_high": 4.0,
+        "rms_threshold": 0.0,
+        "mwcs_wlen": 12.0,
+        "mwcs_step": 4.0
+      },
+      {
+        "ref": 7,
+        "low": 4.0,
+        "high": 7.0,
+        "mwcs_low": 4.0,
+        "mwcs_high": 7.0,
+        "rms_threshold": 0.0,
+        "mwcs_wlen": 12.0,
+        "mwcs_step": 4.0
+      },
+      {
+        "ref": 8,
+        "low": 7.0,
+        "high": 10.0,
+        "mwcs_low": 7.0,
+        "mwcs_high": 10.0,
+        "rms_threshold": 0.0,
+        "mwcs_wlen": 12.0,
+        "mwcs_step": 4.0
+      }
+    ]
   },
   "visualization": {
       "figs_folder": "./Figs",
       "cc_files": "./STACKS/01/001_DAYS/ZZ",
       "dtt_folder": "./DTT/01/005_DAYS/ZZ",
       "station1": "5S-R7B57",          
-      "station2": "XH-GL5",
-      "ccf_date": "2021-05-05"          
+      "station2": "5S-R94DB",
+      "ccf_date": "2021-03-14"          
   }
 }
