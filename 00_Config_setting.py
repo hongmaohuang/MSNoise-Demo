@@ -8,6 +8,7 @@ from obspy import UTCDateTime
 from obspy.clients.fdsn import Client
 from config_loader import load_config
 from datetime import datetime
+
 METADATA_CSV = "downloaded_stations_metadata.csv"
 
 def step1_search_and_download(config):
@@ -33,13 +34,14 @@ def step1_search_and_download(config):
 
     station_metadata = {}
     found_stations = []
+    target_channels = "HH?,BH?,EH?" 
 
     print("\n--> Querying FDSN for available stations...")
     for client_name in clients:
         try:
             client = Client(client_name, timeout=30)
             inventory = client.get_stations(
-                network="*", station="*", location="*", channel="HHZ,BHZ,EHZ",
+                network="*", station="*", location="*", channel=target_channels,
                 starttime=start_time, endtime=end_time,
                 minlatitude=min_lat, maxlatitude=max_lat,
                 minlongitude=min_lon, maxlongitude=max_lon,
@@ -99,7 +101,7 @@ def step1_search_and_download(config):
                 continue
             try:
                 client = Client(preferred_client, timeout=60)
-                st = client.get_waveforms(net, sta, "*", "HHZ,BHZ,EHZ,Z", t1, t2)
+                st = client.get_waveforms(net, sta, "*", target_channels, t1, t2)
                 if len(st) > 0:
                     st.write(filename, format="MSEED")
                     print(f"  - {date_str}: Downloaded.")
@@ -123,27 +125,6 @@ def step2_process_to_sds(config):
         
         print(f"--> Scanning raw folder: {os.path.basename(station_dir)}")
         for filepath in glob.glob(os.path.join(station_dir, "*.mseed")):
-            
-            try:
-                filename_base = os.path.basename(filepath) 
-                parts = filename_base.split('.')
-                if len(parts) >= 3:
-                    p_date = parts[2] 
-                    t_obj = UTCDateTime(p_date)
-                    p_year = str(t_obj.year)
-                    p_doy = f"{t_obj.julday:03d}"
-                    p_net = parts[0]
-                    p_sta = parts[1]
-                    
-                    check_sds_name = f"{p_net}.{p_sta}..HHZ.D.{p_year}.{p_doy}"
-                    check_sds_path = os.path.join(output_folder, p_year, p_net, p_sta, check_sds_name)
-                    
-                    if os.path.exists(check_sds_path):
-                        # print(f"  [Skip] SDS exists: {check_sds_name}")
-                        continue
-            except Exception:
-                pass
-
             try:
                 st = obspy.read(filepath)
                 try:
@@ -151,9 +132,17 @@ def step2_process_to_sds(config):
                 except: pass
                 
                 for tr in st:
-                    if len(tr.stats.channel) >= 3:
-                        if tr.stats.channel[-1].upper() not in ['N', 'E', 'Z']:
-                             tr.stats.channel = "HHZ"
+                    
+                    original_chan = tr.stats.channel
+                    if len(original_chan) >= 1:
+                        last_char = original_chan[-1].upper()
+                        
+
+                        if last_char in ['Z', 'N', 'E']:
+                            pass 
+                        
+                        else:
+                            tr.stats.channel = "HHZ"
                     else:
                         tr.stats.channel = "HHZ"
                     
@@ -170,7 +159,7 @@ def step2_process_to_sds(config):
                         if day_slice.stats.npts > 0:
                             year = str(current_time.year)
                             net, sta, chan = day_slice.stats.network, day_slice.stats.station, day_slice.stats.channel
-                            # SDS Path: YEAR/NET/STA
+                            
                             save_dir = os.path.join(output_folder, year, net, sta)
                             if not os.path.exists(save_dir): os.makedirs(save_dir)
                             
@@ -187,7 +176,6 @@ def step2_process_to_sds(config):
     print("SDS Structure Update Completed.")
 
 def step3_scan_to_db(config):
-    
     print("\n" + "="*60)
     print("STEP 3: Update DB & Scan SDS")
     print("="*60)
@@ -201,7 +189,6 @@ def step3_scan_to_db(config):
     if not os.path.exists(db_path):
         print(f"Hey, there is no {db_path}！")
         print("Please run this before this script: msnoise db init")
-        print("Remember to select SQLite, and leave blank on Prefix")
         return 
 
     conn = sqlite3.connect(db_path)
@@ -212,13 +199,16 @@ def step3_scan_to_db(config):
         end_date = search_cfg.get("end_date", "2030-01-01")
         today_str = datetime.now().strftime("%Y-%m-%d")
 
-        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('components_to_compute', 'ZZ')")
+        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('components_to_compute', 'ZZ,NN,EE')")
+        
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('data_folder', ?)", (sds_root,))
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('data_structure', 'SDS')")
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('data_type', 'D')")
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('startdate', ?)", (start_date,))
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('enddate', ?)", (end_date,))
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('ref_end', ?)", (today_str,))
+        
+        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('components_to_compute_single_station', 'ZZ,NN,EE,ZN,ZE,NE')")
 
         if os.path.exists(METADATA_CSV):
             print("--> Loading station coordinates from CSV...")
@@ -231,7 +221,7 @@ def step3_scan_to_db(config):
                         VALUES (?, ?, ?, ?, ?, 'DEG', 'INST', 1)
                     """, (row['Network'], row['Station'], float(row['Longitude']), float(row['Latitude']), float(row['Elevation'])))
         else:
-            print("Warning: No metadata CSV found. (Did you skip Step 1?) Station coordinates might be missing.")
+            print("Warning: No metadata CSV found.")
 
         fcfg = scan_cfg.get("filter_config", {})
         cursor.execute("DELETE FROM filters")
