@@ -23,9 +23,7 @@ This repository demonstrates a minimal MSNoise processing pipeline for convertin
    ```bash
    python 00_Config_setting.py
    ```
-   This version currently targets the Z component only. Single-station pairs via `msnoise components_to_compute_single_station` are under testing.
-
-   Before proceeding, run `msnoise admin` and review the parameter settings in the interface to confirm they are ready for CCF computation.
+   Before proceeding, run `msnoise admin` and review the parameter settings in the interface to confirm they are ready for CCF computation. For example, the stacking window.
 
 2. **Run MSNoise processing**
    ```bash
