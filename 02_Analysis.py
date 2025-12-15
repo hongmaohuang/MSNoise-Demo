@@ -104,7 +104,6 @@ class MSNoiseVisualizer:
         out_file = os.path.join(self.figs_output, f"CCF_{self.pair_name}.png")
         plt.savefig(out_file, dpi=300)
         print(f"CCF Plot saved to {out_file}")
-        plt.show()
 
     def _get_filter_mapping(self):
         if not os.path.exists(self.db_path):
@@ -208,7 +207,6 @@ class MSNoiseVisualizer:
         out_file = os.path.join(self.figs_output, f"dvv_{self.pair_name}.png")
         plt.savefig(out_file, dpi=300)
         print(f"dv/v Plot saved to {out_file}")
-        plt.show()
 
 if __name__ == "__main__":
     viz = MSNoiseVisualizer("config.json")
