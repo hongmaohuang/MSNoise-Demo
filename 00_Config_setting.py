@@ -132,15 +132,11 @@ def step2_process_to_sds(config):
                 except: pass
                 
                 for tr in st:
-                    
                     original_chan = tr.stats.channel
                     if len(original_chan) >= 1:
                         last_char = original_chan[-1].upper()
-                        
-
                         if last_char in ['Z', 'N', 'E']:
                             pass 
-                        
                         else:
                             tr.stats.channel = "HHZ"
                     else:
@@ -171,7 +167,6 @@ def step2_process_to_sds(config):
                                 day_slice.write(final_path, format="MSEED")
                         current_time = next_day
             except Exception as e:
-                # print(f"Error file: {filepath} ({e})")
                 pass
     print("SDS Structure Update Completed.")
 
@@ -200,7 +195,6 @@ def step3_scan_to_db(config):
         today_str = datetime.now().strftime("%Y-%m-%d")
 
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('components_to_compute', 'ZZ,NN,EE')")
-        
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('data_folder', ?)", (sds_root,))
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('data_structure', 'SDS')")
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('data_type', 'D')")
@@ -223,12 +217,33 @@ def step3_scan_to_db(config):
         else:
             print("Warning: No metadata CSV found.")
 
-        fcfg = scan_cfg.get("filter_config", {})
+        raw_filters = scan_cfg.get("filter_config", [])
+        
+        if isinstance(raw_filters, dict):
+            raw_filters = [raw_filters]
+            
+        print(f"--> Updating Filters (Found {len(raw_filters)} filters)...")
+        
         cursor.execute("DELETE FROM filters")
-        cursor.execute("""
-            INSERT INTO filters (ref, low, mwcs_low, high, mwcs_high, rms_threshold, mwcs_wlen, mwcs_step, used)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-        """, (fcfg['ref'], fcfg['low'], fcfg['mwcs_low'], fcfg['high'], fcfg['mwcs_high'], fcfg['rms_threshold'], fcfg['mwcs_wlen'], fcfg['mwcs_step']))
+        
+        for fcfg in raw_filters:
+            try:
+                cursor.execute("""
+                    INSERT INTO filters (ref, low, mwcs_low, high, mwcs_high, rms_threshold, mwcs_wlen, mwcs_step, used)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+                """, (
+                    fcfg['ref'], 
+                    fcfg['low'], 
+                    fcfg['mwcs_low'], 
+                    fcfg['high'], 
+                    fcfg['mwcs_high'], 
+                    fcfg['rms_threshold'], 
+                    fcfg['mwcs_wlen'], 
+                    fcfg['mwcs_step']
+                ))
+                print(f"    - Added Filter ID {fcfg['ref']}: {fcfg['low']}-{fcfg['high']} Hz")
+            except Exception as e_filt:
+                print(f"    ! Error adding filter {fcfg.get('ref', '?')}: {e_filt}")
 
         print("--> Scanning SDS files to update database...")
         cursor.execute("DELETE FROM data_availability")
@@ -245,7 +260,6 @@ def step3_scan_to_db(config):
                 try:
                     st = obspy.read(os.path.join(root, file), headonly=True)
                     tr = st[0]
-                    
                     rel_dir = os.path.relpath(root, sds_root)
                     
                     cursor.execute("""
