@@ -45,7 +45,7 @@ def step1_search_and_download(config):
                 starttime=start_time, endtime=end_time,
                 minlatitude=min_lat, maxlatitude=max_lat,
                 minlongitude=min_lon, maxlongitude=max_lon,
-                level="channel"
+                level="channel" 
             )
             
             valid_count = 0
@@ -54,6 +54,13 @@ def step1_search_and_download(config):
                     if not (min_lat <= sta.latitude <= max_lat and min_lon <= sta.longitude <= max_lon):
                         continue
                     
+                    avail_chans = set([c.code for c in sta.channels])
+                    has_horizontal = any(c[-1] in ['N', 'E', '1', '2'] for c in avail_chans)
+                    
+                    msg_suffix = ""
+                    if not has_horizontal:
+                        msg_suffix = f" [WARN: Only has {avail_chans}, NO Horizontal!]"
+
                     sta_key = f"{net.code}.{sta.code}"
                     if sta_key not in station_metadata:
                         station_metadata[sta_key] = {
@@ -64,6 +71,10 @@ def step1_search_and_download(config):
                             "net": net.code, "sta": sta.code, "client": client_name
                         })
                         valid_count += 1
+                        
+                        if not has_horizontal:
+                            print(f"    - Found {sta_key} ({client_name}).{msg_suffix}")
+
             print(f"    [{client_name}] Valid stations found: {valid_count}")
 
         except Exception as e:
@@ -102,11 +113,15 @@ def step1_search_and_download(config):
             try:
                 client = Client(preferred_client, timeout=60)
                 st = client.get_waveforms(net, sta, "*", target_channels, t1, t2)
+                
                 if len(st) > 0:
                     st.write(filename, format="MSEED")
-                    print(f"  - {date_str}: Downloaded.")
-            except:
-                print(f"  - {date_str}: Failed/No Data.")
+                    comps = list(set([tr.stats.channel for tr in st]))
+                    print(f"  - {date_str}: Downloaded {len(st)} traces. Chans: {comps}")
+                else:
+                    print(f"  - {date_str}: No data found on server.")
+            except Exception as e:
+                print(f"  - {date_str}: Failed ({str(e).splitlines()[0]})")
 
 def step2_process_to_sds(config):
     print("\n" + "="*60)
@@ -130,7 +145,7 @@ def step2_process_to_sds(config):
                 try:
                     st.merge(method=1, fill_value='interpolate')
                 except: pass
-                
+                ''' 
                 for tr in st:
                     original_chan = tr.stats.channel
                     if len(original_chan) >= 1:
@@ -141,7 +156,36 @@ def step2_process_to_sds(config):
                             tr.stats.channel = "HHZ"
                     else:
                         tr.stats.channel = "HHZ"
+                '''
+                for tr in st:
+                    original_chan = tr.stats.channel
                     
+                    print(f"   [DEBUG] {tr.stats.network}.{tr.stats.station} original chanel: {original_chan}", end=" => ")
+
+                    if len(original_chan) >= 1:
+                        last_char = original_chan[-1].upper()
+                        
+                        if last_char in ['Z', 'N', 'E']:
+                            print(f"Keep the chanels ({original_chan})") 
+                            pass 
+                        
+                        elif last_char == '1':
+                            new_chan = original_chan[:-1] + 'N'
+                            tr.stats.channel = new_chan
+                            print(f"Modify the chanel ({original_chan} -> {new_chan})") 
+
+                        elif last_char == '2':
+                            new_chan = original_chan[:-1] + 'E'
+                            tr.stats.channel = new_chan
+                            print(f"Modify the chanel ({original_chan} -> {new_chan})") 
+
+                        else:
+                            tr.stats.channel = "HHZ"
+                            print(f"Force the component of DAS to Z (bc it's {last_char})") 
+                            
+                    else:
+                        tr.stats.channel = "HHZ"
+                        print("Force the component of DAS to Z (because no channel name)")
                     start_time = tr.stats.starttime
                     end_time = tr.stats.endtime
                     current_time = UTCDateTime(start_time.date)
@@ -190,8 +234,8 @@ def step3_scan_to_db(config):
     cursor = conn.cursor()
 
     try:
-        start_date = search_cfg.get("start_date", "2020-01-01")
-        end_date = search_cfg.get("end_date", "2030-01-01")
+        start_date = search_cfg.get("start_date", "1970-01-01")
+        end_date = search_cfg.get("end_date", "2099-01-01")
         today_str = datetime.now().strftime("%Y-%m-%d")
 
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('components_to_compute', 'ZZ,NN,EE')")
@@ -201,7 +245,6 @@ def step3_scan_to_db(config):
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('startdate', ?)", (start_date,))
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('enddate', ?)", (end_date,))
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('ref_end', ?)", (today_str,))
-        
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('components_to_compute_single_station', 'ZZ,NN,EE,ZN,ZE,NE')")
 
         if os.path.exists(METADATA_CSV):
