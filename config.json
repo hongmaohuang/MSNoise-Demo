@@ -8,14 +8,18 @@
       "min_lon": -22.5437,
       "max_lon": -22.2110
     },
-    "clients": ["GFZ", "IRIS", "EIDA"]
+    "clients": [
+      "GFZ",
+      "IRIS",
+      "EIDA"
+    ]
   },
   "seismic_processing": {
     "source_folder": "../Seismic_Data",
     "output_folder": "SDS"
   },
   "data_scan": {
-    "sds_root": "/media/kmaterna/rocket/hmhuang/Research/Iceland/MSNoise-Demo", 
+    "sds_root": "/media/kmaterna/rocket/hmhuang/Research/Iceland/MSNoise-Demo",
     "db_path": "msnoise.sqlite",
     "filter_config": [
       {
@@ -100,12 +104,17 @@
       }
     ]
   },
-  "visualization": {
-      "figs_folder": "./Figs",
-      "cc_files": "./STACKS/01/001_DAYS/ZZ",
-      "dtt_folder": "./DTT/01/005_DAYS/ZZ",
-      "station1": "5S-R7B57",          
-      "station2": "5S-R94DB",
-      "ccf_date": "2021-03-14"          
+"visualization": {
+    "figs_folder": "./Figs",
+    "filter_set": "01",
+    "cc_files_template": "./STACKS/{filter_set}/001_DAYS/{component}",
+    "dtt_folder_template": "./DTT/{filter_set}/005_DAYS/{component}",
+    "station1": "5S-R0050",
+    "station2": "5S-R7B57",
+    "ccf_date": "2021-03-27",
+    "component": "ZZ",
+    "dvv_target": "ALL",
+    "_comment_target": "For dvv_target, you can put it as ALL or PAIR"
   }
 }
+
