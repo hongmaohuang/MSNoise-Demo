@@ -1,12 +1,12 @@
 {
   "search_criteria": {
-    "start_date": "2021-01-01",
-    "end_date": "2021-12-31",
+    "start_date": "2025-01-01",
+    "end_date": "2025-12-31",
     "region": {
-      "min_lat": 63.8078,
-      "max_lat": 63.9936,
-      "min_lon": -22.5437,
-      "max_lon": -22.2110
+      "min_lat": 50.0,
+      "max_lat": 53.0,
+      "min_lon": 23.0,
+      "max_lon": 24.0
     },
     "clients": [
       "GFZ",
@@ -19,7 +19,7 @@
     "output_folder": "SDS"
   },
   "data_scan": {
-    "sds_root": "/media/kmaterna/rocket/hmhuang/Research/Iceland/MSNoise-Demo",
+    "sds_root": "your MSNoise working directory",
     "db_path": "msnoise.sqlite",
     "filter_config": [
       {
@@ -109,12 +109,12 @@
     "filter_set": "01",
     "cc_files_template": "./STACKS/{filter_set}/001_DAYS/{component}",
     "dtt_folder_template": "./DTT/{filter_set}/005_DAYS/{component}",
-    "station1": "5S-R0050",
-    "station2": "5S-R7B57",
-    "ccf_date": "2021-03-27",
+    "station1": "NET-STA1",
+    "station2": "NET-STA2",
+    "ccf_date": "2025-01-01",
     "component": "ZZ",
     "dvv_target": "ALL",
-    "_comment_target": "For dvv_target, you can put it as ALL or PAIR"
+    "_comment_target": "For station1 and station2, you should put it as NET-STATION. For station R0050 in network 5S as an example, you should put it as 5S-R0050. For dvv_target, you can put it as ALL or PAIR. Also, for dtt_folder_template, please note that the XXX_Days in the path depends on your config for MSNoise."
   }
 }
 
