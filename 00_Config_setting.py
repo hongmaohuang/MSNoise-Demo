@@ -246,6 +246,13 @@ def step3_scan_to_db(config):
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('enddate', ?)", (end_date,))
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('ref_end', ?)", (today_str,))
         cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('components_to_compute_single_station', 'ZZ,NN,EE,ZN,ZE,NE')")
+        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('dtt_lag', 'dynamic')")
+        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('dtt_v', '1.5')")
+        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('dtt_width', '30.0')")
+        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('dtt_sides', 'both')")
+        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('dtt_minlag', '5.0')")
+        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('stack_method', 'pws')")
+
 
         if os.path.exists(METADATA_CSV):
             print("--> Loading station coordinates from CSV...")
