@@ -1,15 +1,96 @@
 import os
 import glob
 import csv
-import sqlite3
 import obspy
-import subprocess
+from collections import defaultdict
 from obspy import UTCDateTime
 from obspy.clients.fdsn import Client
-from config_loader import load_config
-from datetime import datetime
+from config_loader import load_config, validate_config
+from typing import Iterable
 
 METADATA_CSV = "downloaded_stations_metadata.csv"
+FAILED_DOWNLOADS_CSV = "failed_waveform_downloads.csv"
+
+def _ensure_dir(path: str) -> None:
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+def _iter_client_order(preferred: str, all_clients: Iterable[str]) -> Iterable[str]:
+    ordered = [preferred] + [c for c in all_clients if c != preferred]
+    return ordered
+
+def _download_day(
+    net: str,
+    sta: str,
+    station_dir: str,
+    date_str: str,
+    t1: UTCDateTime,
+    t2: UTCDateTime,
+    preferred_client: str,
+    clients: Iterable[str],
+    locations: str,
+    channels: str,
+    waveform_timeout: int,
+) -> tuple[str, str | None, str | None]:
+    filename = os.path.join(station_dir, f"{net}.{sta}.{date_str}.mseed")
+
+    if os.path.exists(filename):
+        print(f"  - {date_str}: Exists (Skipping).")
+        return "exists", None, filename
+
+    last_err = None
+    for client_name in _iter_client_order(preferred_client, clients):
+        try:
+            client = Client(client_name, timeout=waveform_timeout)
+            st = client.get_waveforms(net, sta, locations, channels, t1, t2)
+            if len(st) > 0:
+                st.write(filename, format="MSEED")
+                comps = sorted(set(tr.stats.channel for tr in st))
+                print(f"  - {date_str}: Downloaded {len(st)} traces from {client_name}. Chans: {comps}")
+                return "downloaded", None, filename
+            print(f"  - {date_str}: No data found on {client_name}.")
+            return "no_data", None, filename
+        except Exception as e:
+            last_err = e
+
+    msg = str(last_err).splitlines()[0] if last_err else "Unknown error"
+    print(f"  - {date_str}: Skipped for retry ({msg})")
+    return "skipped", msg, filename
+
+
+def _write_failed_downloads(failures: list[dict[str, str]]) -> None:
+    with open(FAILED_DOWNLOADS_CSV, "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.DictWriter(
+            csvfile,
+            fieldnames=["network", "station", "date", "preferred_client", "filename", "error"],
+        )
+        writer.writeheader()
+        writer.writerows(failures)
+
+
+def _print_download_summary(summary: dict[str, dict[str, int]], final_failures: list[dict[str, str]]) -> None:
+    print("\n--> Waveform download summary")
+    for sta_key in sorted(summary):
+        counts = summary[sta_key]
+        parts = [
+            f"downloaded={counts['downloaded']}",
+            f"exists={counts['exists']}",
+            f"no_data={counts['no_data']}",
+            f"first_pass_skipped={counts['skipped']}",
+            f"retried={counts['retried']}",
+            f"failed={counts['failed']}",
+        ]
+        print(f"    {sta_key}: " + ", ".join(parts))
+
+    if not final_failures:
+        if os.path.exists(FAILED_DOWNLOADS_CSV):
+            os.remove(FAILED_DOWNLOADS_CSV)
+        print("    No skipped days remain after retry.")
+        return
+
+    _write_failed_downloads(final_failures)
+    print(f"    Final skipped days: {len(final_failures)}")
+    print(f"    Saved failed download list to {FAILED_DOWNLOADS_CSV}")
 
 def step1_search_and_download(config):
     print("\n" + "="*60)
@@ -20,28 +101,40 @@ def step1_search_and_download(config):
     proc_cfg = config.get("seismic_processing", {})
     
     start_time = UTCDateTime(search_cfg.get("start_date"))
-    end_time   = UTCDateTime(search_cfg.get("end_date"))
+    end_time = UTCDateTime(search_cfg.get("end_date"))
     region     = search_cfg.get("region", {})
     clients    = search_cfg.get("clients", ["GFZ", "IRIS"])
+    target_networks = search_cfg.get("networks", "*")
+    target_stations = search_cfg.get("stations", "*")
+    target_locations = search_cfg.get("locations", "*")
+    target_channels = search_cfg.get("channels", "HH?,BH?,EH?")
+    waveform_timeout = int(search_cfg.get("waveform_timeout", 30))
     
     output_base_dir = proc_cfg.get("source_folder", "../Seismic_Data")
     
     min_lat, max_lat = region.get("min_lat"), region.get("max_lat")
     min_lon, max_lon = region.get("min_lon"), region.get("max_lon")
 
+    if start_time >= end_time:
+        raise ValueError(f"start_date must be before end_date: {start_time} >= {end_time}")
+
     print(f"Time Range: {start_time.date} to {end_time.date}")
     print(f"Region: Lat[{min_lat}, {max_lat}], Lon[{min_lon}, {max_lon}]")
+    print(f"Networks: {target_networks}")
+    print(f"Stations: {target_stations}")
+    print(f"Locations: {target_locations}")
+    print(f"Channels: {target_channels}")
+    print(f"Waveform timeout: {waveform_timeout} seconds")
 
     station_metadata = {}
     found_stations = []
-    target_channels = "HH?,BH?,EH?" 
 
     print("\n--> Querying FDSN for available stations...")
     for client_name in clients:
         try:
             client = Client(client_name, timeout=30)
             inventory = client.get_stations(
-                network="*", station="*", location="*", channel=target_channels,
+                network=target_networks, station=target_stations, location=target_locations, channel=target_channels,
                 starttime=start_time, endtime=end_time,
                 minlatitude=min_lat, maxlatitude=max_lat,
                 minlongitude=min_lon, maxlongitude=max_lon,
@@ -92,36 +185,93 @@ def step1_search_and_download(config):
     print(f"--> Metadata saved to {METADATA_CSV}")
 
     total_days = int((end_time - start_time) / 86400) + 1
+    skipped_for_retry = []
+    summary = defaultdict(lambda: defaultdict(int))
     
     for sta_info in found_stations:
         net, sta = sta_info['net'], sta_info['sta']
         preferred_client = sta_info['client']
+        sta_key = f"{net}.{sta}"
         
-        station_dir = os.path.join(output_base_dir, sta)
-        if not os.path.exists(station_dir): os.makedirs(station_dir)
+        station_dir = os.path.join(output_base_dir, f"{net}.{sta}")
+        _ensure_dir(station_dir)
             
         print(f"\nProcessing {net}.{sta} (Source: {preferred_client})")
         for i in range(total_days):
             t1 = start_time + (i * 86400)
             t2 = t1 + 86400
             date_str = t1.strftime("%Y-%m-%d")
-            filename = os.path.join(station_dir, f"{net}.{sta}.{date_str}.mseed")
-            
-            if os.path.exists(filename):
-                print(f"  - {date_str}: Exists (Skipping).") 
-                continue
-            try:
-                client = Client(preferred_client, timeout=60)
-                st = client.get_waveforms(net, sta, "*", target_channels, t1, t2)
-                
-                if len(st) > 0:
-                    st.write(filename, format="MSEED")
-                    comps = list(set([tr.stats.channel for tr in st]))
-                    print(f"  - {date_str}: Downloaded {len(st)} traces. Chans: {comps}")
-                else:
-                    print(f"  - {date_str}: No data found on server.")
-            except Exception as e:
-                print(f"  - {date_str}: Failed ({str(e).splitlines()[0]})")
+            status, error, filename = _download_day(
+                net,
+                sta,
+                station_dir,
+                date_str,
+                t1,
+                t2,
+                preferred_client,
+                clients,
+                target_locations,
+                target_channels,
+                waveform_timeout,
+            )
+            summary[sta_key][status] += 1
+            if status == "skipped":
+                skipped_for_retry.append(
+                    {
+                        "net": net,
+                        "sta": sta,
+                        "station_dir": station_dir,
+                        "date_str": date_str,
+                        "t1": t1,
+                        "t2": t2,
+                        "preferred_client": preferred_client,
+                        "filename": filename or "",
+                        "error": error or "",
+                    }
+                )
+
+    final_failures = []
+    if skipped_for_retry:
+        print("\n--> Retrying skipped waveform days once...")
+    for item in skipped_for_retry:
+        net = item["net"]
+        sta = item["sta"]
+        sta_key = f"{net}.{sta}"
+        print(f"\nRetrying {sta_key} {item['date_str']}")
+        status, error, filename = _download_day(
+            net,
+            sta,
+            item["station_dir"],
+            item["date_str"],
+            item["t1"],
+            item["t2"],
+            item["preferred_client"],
+            clients,
+            target_locations,
+            target_channels,
+            waveform_timeout,
+        )
+        summary[sta_key]["retried"] += 1
+        if status == "downloaded":
+            summary[sta_key]["downloaded"] += 1
+        elif status == "exists":
+            summary[sta_key]["exists"] += 1
+        elif status == "no_data":
+            summary[sta_key]["no_data"] += 1
+        else:
+            summary[sta_key]["failed"] += 1
+            final_failures.append(
+                {
+                    "network": net,
+                    "station": sta,
+                    "date": item["date_str"],
+                    "preferred_client": item["preferred_client"],
+                    "filename": filename or item["filename"],
+                    "error": error or item["error"],
+                }
+            )
+
+    _print_download_summary(summary, final_failures)
 
 def step2_process_to_sds(config):
     print("\n" + "="*60)
@@ -132,8 +282,11 @@ def step2_process_to_sds(config):
     source_folder = proc_cfg.get("source_folder")
     output_folder = proc_cfg.get("output_folder", "SDS")
     
-    if not os.path.exists(output_folder): os.makedirs(output_folder)
+    _ensure_dir(output_folder)
     
+    if not source_folder or not os.path.exists(source_folder):
+        raise FileNotFoundError(f"source_folder does not exist: {source_folder}")
+
     search_path = os.path.join(source_folder, "*")
     for station_dir in glob.glob(search_path):
         if not os.path.isdir(station_dir): continue
@@ -144,7 +297,8 @@ def step2_process_to_sds(config):
                 st = obspy.read(filepath)
                 try:
                     st.merge(method=1, fill_value='interpolate')
-                except: pass
+                except Exception as e:
+                    print(f"    [WARN] Merge failed for {filepath}: {e}")
                 ''' 
                 for tr in st:
                     original_chan = tr.stats.channel
@@ -211,130 +365,15 @@ def step2_process_to_sds(config):
                                 day_slice.write(final_path, format="MSEED")
                         current_time = next_day
             except Exception as e:
-                pass
+                print(f"    [WARN] Failed to process {filepath}: {e}")
     print("SDS Structure Update Completed.")
-
-def step3_scan_to_db(config):
-    print("\n" + "="*60)
-    print("STEP 3: Update DB & Scan SDS")
-    print("="*60)
-
-    scan_cfg = config.get("data_scan", {})
-    search_cfg = config.get("search_criteria", {})
-    
-    sds_root = scan_cfg.get("sds_root")
-    db_path = scan_cfg.get("db_path", "msnoise.sqlite")
-    
-    if not os.path.exists(db_path):
-        print(f"Hey, there is no {db_path}！")
-        print("Please run this before this script: msnoise db init")
-        return 
-
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    try:
-        start_date = search_cfg.get("start_date", "1970-01-01")
-        end_date = search_cfg.get("end_date", "2099-01-01")
-        today_str = datetime.now().strftime("%Y-%m-%d")
-
-        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('components_to_compute', 'ZZ,NN,EE')")
-        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('data_folder', ?)", (sds_root,))
-        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('data_structure', 'SDS')")
-        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('data_type', 'D')")
-        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('startdate', ?)", (start_date,))
-        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('enddate', ?)", (end_date,))
-        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('ref_end', ?)", (today_str,))
-        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('components_to_compute_single_station', 'ZZ,NN,EE,ZN,ZE,NE')")
-        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('dtt_lag', 'dynamic')")
-        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('dtt_v', '1.5')")
-        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('dtt_width', '30.0')")
-        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('dtt_sides', 'both')")
-        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('dtt_minlag', '5.0')")
-        cursor.execute("INSERT OR REPLACE INTO config (name, value) VALUES ('stack_method', 'pws')")
-
-
-        if os.path.exists(METADATA_CSV):
-            print("--> Loading station coordinates from CSV...")
-            cursor.execute("DELETE FROM stations")
-            with open(METADATA_CSV, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    cursor.execute("""
-                        INSERT INTO stations (net, sta, X, Y, altitude, coordinates, instrument, used)
-                        VALUES (?, ?, ?, ?, ?, 'DEG', 'INST', 1)
-                    """, (row['Network'], row['Station'], float(row['Longitude']), float(row['Latitude']), float(row['Elevation'])))
-        else:
-            print("Warning: No metadata CSV found.")
-
-        raw_filters = scan_cfg.get("filter_config", [])
-        
-        if isinstance(raw_filters, dict):
-            raw_filters = [raw_filters]
-            
-        print(f"--> Updating Filters (Found {len(raw_filters)} filters)...")
-        
-        cursor.execute("DELETE FROM filters")
-        
-        for fcfg in raw_filters:
-            try:
-                cursor.execute("""
-                    INSERT INTO filters (ref, low, mwcs_low, high, mwcs_high, rms_threshold, mwcs_wlen, mwcs_step, used)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-                """, (
-                    fcfg['ref'], 
-                    fcfg['low'], 
-                    fcfg['mwcs_low'], 
-                    fcfg['high'], 
-                    fcfg['mwcs_high'], 
-                    fcfg['rms_threshold'], 
-                    fcfg['mwcs_wlen'], 
-                    fcfg['mwcs_step']
-                ))
-                print(f"    - Added Filter ID {fcfg['ref']}: {fcfg['low']}-{fcfg['high']} Hz")
-            except Exception as e_filt:
-                print(f"    ! Error adding filter {fcfg.get('ref', '?')}: {e_filt}")
-
-        print("--> Scanning SDS files to update database...")
-        cursor.execute("DELETE FROM data_availability")
-        
-        sds_folder_name = config.get("seismic_processing", {}).get("output_folder", "SDS")
-        sds_full_path = os.path.abspath(sds_folder_name)
-        
-        if not os.path.exists(sds_full_path):
-             sds_full_path = os.path.join(sds_root, "SDS")
-
-        count = 0
-        for root, dirs, files in os.walk(sds_full_path):
-            for file in files:
-                try:
-                    st = obspy.read(os.path.join(root, file), headonly=True)
-                    tr = st[0]
-                    rel_dir = os.path.relpath(root, sds_root)
-                    
-                    cursor.execute("""
-                        INSERT INTO data_availability (net, sta, comp, path, file, starttime, endtime, data_duration, gaps_duration, samplerate, flag)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'N')
-                    """, (tr.stats.network, tr.stats.station, tr.stats.channel, rel_dir, file, 
-                          tr.stats.starttime.datetime, tr.stats.endtime.datetime, 
-                          tr.stats.endtime - tr.stats.starttime, tr.stats.sampling_rate))
-                    count += 1
-                except: pass
-        
-        print(f"Scan complete. {count} files registered in database.")
-        conn.commit()
-
-    except Exception as e:
-        print(f"DB Error: {e}")
-    finally:
-        conn.close()
 
 if __name__ == "__main__":
     try:
         conf = load_config()
+        validate_config(conf)
         step1_search_and_download(conf)
         step2_process_to_sds(conf)
-        step3_scan_to_db(conf)
-        print("\nAll Done! Now you can run 'msnoise new_jobs --init' and 'msnoise compute_cc'.")
+        print("\nAll Done! Run the scan script to update the MSNoise DB.")
     except Exception as e:
         print(f"Execution Error: {e}")
