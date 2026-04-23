@@ -19,15 +19,16 @@ for a small study area in eastern Taiwan.
    ```
 5. Pre-check station availability:
    ```bash
-   python pre-check-seismic-data.py \
+   python 00_check_data.py \
      --min-lon 121.0 --max-lon 122.5 \
      --min-lat 22.0 --max-lat 24.8 \
      --start 2025-01-01 --end 2025-01-02
    ```
 6. Run the data-prep and MSNoise pipeline:
    ```bash
-   python 00_Config_setting.py
-   python 01_Scan_to_DB.py
+   bash 01_download_data.sh --csv pre_check_seismic_segments.csv
+   python 02_convert_data_sds.py
+   python 03_Scan_to_DB.py
    msnoise new_jobs --init
    msnoise compute_cc
    msnoise stack -r
@@ -40,6 +41,6 @@ for a small study area in eastern Taiwan.
 ## Expected outputs (high level)
 - Interactive availability map in `./pre_check_seismic_data.html`
 - Station/channel availability CSV in `./pre_check_seismic_segments.csv`
-- Raw daily MiniSEED in `./Seismic_Data/<NET.STA>/`
+- Raw daily MiniSEED in `./Precheck_Waveforms/<NET.STA>/`
 - SDS tree in `./SDS/<YEAR>/<NET>/<STA>/`
 - MSNoise DB in `./msnoise.sqlite`
