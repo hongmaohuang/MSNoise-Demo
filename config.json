@@ -1,23 +1,83 @@
 {
+  "workflow": {
+    "steps": [
+      "precheck"
+    ],
+    "_available_steps": [
+      "precheck",
+      "download",
+      "convert",
+      "scan",
+      "dvv"
+    ],
+    "_comment": "Set steps to [\"precheck\", \"download\", \"convert\", \"scan\", \"dvv\"] when you want the full workflow."
+  },
   "search_criteria": {
-    "start_date": "2025-01-01",
-    "end_date": "2025-12-31",
+    "start_date": "2020-01-01",
+    "end_date": "2022-12-31",
     "region": {
-      "min_lat": 50.0,
-      "max_lat": 53.0,
-      "min_lon": 23.0,
-      "max_lon": 24.0
+      "min_lat": 63.80227159267316,
+      "max_lat": 63.8967698440704,
+      "min_lon": -22.49335749174607,
+      "max_lon": -22.337737201497493
     },
     "clients": [
       "GFZ",
       "IRIS",
-      "EIDA"
+      "EIDA",
+      "ORFEUS"
     ],
     "networks": "*",
     "stations": "*",
     "locations": "*",
-    "channels": "HH?,BH?,EH?",
+    "channels": "*",
+    "include_restricted": false,
     "waveform_timeout": 30
+  },
+  "precheck": {
+    "csv": "pre_check_seismic_segments.csv",
+    "output": "pre_check_seismic_data.html",
+    "workers": 6,
+    "basemap": "nolabels",
+    "max_popup_rows": 90,
+    "obspy_double_check": true,
+    "obspy_routers": [
+      "iris-federator",
+      "eida-routing"
+    ]
+  },
+  "download": {
+    "csv": "pre_check_seismic_segments.csv",
+    "output_dir": "../Seismic_Data",
+    "failed_csv": "failed_precheck_waveform_downloads.csv",
+    "timeout": 60,
+    "date_from": "2020-01-01",
+    "date_to": "2022-12-31",
+    "limit_tasks": "",
+    "station_patterns": []
+  },
+  "processing": {
+    "dvv_mode": "daily",
+    "_comment_dvv_mode": "Choose one of: both, daily, hourly."
+  },
+  "hourly_processing": {
+    "stage": "all",
+    "cc_root": "CROSS_CORRELATIONS",
+    "stack_root": "HOURLY_STACKS",
+    "mwcs_root": "HOURLY_MWCS",
+    "dvv_root": "HOURLY_DVV",
+    "txt_root": "HOURLY_TXT",
+    "component": "ZZ",
+    "filters": "",
+    "min_windows_per_hour": 1,
+    "reference_start": "",
+    "reference_end": "",
+    "force": false,
+    "include_all": true,
+    "export_txt": true,
+    "min_dtt_points": 3,
+    "max_pairs": "",
+    "max_days": ""
   },
   "seismic_processing": {
     "source_folder": "../Seismic_Data",
@@ -26,6 +86,20 @@
   "data_scan": {
     "sds_root": "your MSNoise working directory",
     "db_path": "msnoise.sqlite",
+    "metadata_csv": "downloaded_stations_metadata.csv",
+    "analysis_duration": 3600,
+    "keep_all": "Y",
+    "keep_days": "Y",
+    "components_to_compute": "ZZ",
+    "components_to_compute_single_station": "ZZ",
+    "data_structure": "SDS",
+    "data_type": "D",
+    "dtt_lag": "dynamic",
+    "dtt_v": "1.5",
+    "dtt_width": "30.0",
+    "dtt_sides": "both",
+    "dtt_minlag": "5.0",
+    "stack_method": "pws",
     "filter_config": [
       {
         "ref": 1,

@@ -1,108 +1,169 @@
-# MSNoise-Demo Workflow
+# MSNoise Workflow
 HM Huang, 2025
 
-This repository demonstrates a minimal MSNoise processing pipeline for checking station availability, downloading raw seismic data, converting them into an SDS layout, configuring the MSNoise database, and visualizing cross-correlation and dv/v results. All scripts share settings through a single `config.json` file at the project root.
+This repository is configured around one editable `config.json`. The normal workflow is:
 
-## Project structure
-- `config.json` – central configuration used by all scripts.
-- `00_check_data.py` – interactive station pre-check workflow and HTML map generator.
-- `01_download_data.sh` – download waveform data from a pre-check CSV.
-- `02_convert_data_sds.py` – convert downloaded MiniSEED files into an SDS layout.
-- `03_Scan_to_DB.py` – scan existing SDS files and populate the MSNoise database availability tables.
-- `01_Visualization_CC.py` – quick-look plots of cross-correlation functions (CCF) and relative velocity change (dv/v) time series.
-- `02_Analysis.py` – heatmaps and additional visualizations for CCF and dv/v products.
-- `config_loader.py` – helper to load the JSON configuration safely.
-- `example_eastern_taiwan/` – ready-to-run example configuration and quick-start notes for a small eastern Taiwan study area.
-
-## Setup
-- Install Python 3 with `obspy`, `numpy`, `pandas`, `matplotlib`, `seaborn`, and `folium` available.
-- A conda environment is recommended for the station pre-check map:
-  ```bash
-  conda create -n seismic-precheck -c conda-forge python=3.11 obspy folium pandas
-  ```
-- Install MSNoise and initialize an empty database:
-  ```bash
-  msnoise db init
-  ```
-  Choose SQLite and leave the table prefix empty when prompted.
-
-## Usage
-1. **Pre-check station availability before downloading waveforms**
-   ```bash
-   conda run -n seismic-precheck python 00_check_data.py \
-     --min-lon -23.6 --max-lon -20.3 \
-     --min-lat 63.6 --max-lat 64.6 \
-     --start 2020-01-01 --end 2026-04-15
-   ```
-   This queries FDSN station services directly and writes:
-   - `pre_check_seismic_data.html` – an interactive map with clickable station/node markers and availability bars.
-   - `pre_check_seismic_segments.csv` – the fresh station/channel availability table returned by the query.
-
-   The default FDSN client list uses routing services plus common global and European data centers. Use `--clients` to override it:
-   ```bash
-   python 00_check_data.py --clients IRIS,GFZ,EIDA
-   ```
-   The default channel selector is `*`, which is intentionally broad enough to include DAS channels such as `HSF` and `MSF`. DAS networks are shown as individual node markers by default. Use `--collapse-das` if the map is too dense.
-
-2. **Download raw waveform data from the pre-check CSV**
-   ```bash
-   bash 01_download_data.sh --csv pre_check_seismic_segments.csv
-   ```
-   This downloads one MiniSEED file per station-day into `Precheck_Waveforms/<NET.STA>/`. The script reads source nodes and time windows from the pre-check CSV, so you can edit the CSV or use `--station-pattern`, `--date-from`, and `--date-to` to customize the download scope without rerunning the station search.
-
-3. **Convert raw MiniSEED files into SDS**
-   ```bash
-   python 02_convert_data_sds.py
-   ```
-   This reads raw files from `seismic_processing.source_folder` and writes an SDS tree into `seismic_processing.output_folder`.
-
-4. **Scan the SDS data into the MSNoise database**
-   ```bash
-   python 03_Scan_to_DB.py
-   ```
-   Before proceeding, run `msnoise admin` and review the parameter settings in the interface to confirm they are ready for CCF computation. For example, the stacking window.
-
-5. **Run MSNoise processing**
-   ```bash
-   msnoise new_jobs --init
-   msnoise compute_cc
-   msnoise stack -r
-   msnoise reset STACK
-   msnoise stack -m
-   msnoise compute_mwcs
-   msnoise compute_dtt
-   ```
-
-6. **Visualize results**
-   ```bash
-   python 01_Visualization_CC.py
-   python 02_Analysis.py
-   ```
-
-## Example configuration
-The `example_eastern_taiwan/` folder contains a short test configuration for eastern Taiwan. To try it from the repository root:
 ```bash
-cp example_eastern_taiwan/config.eastern_taiwan.json ./config.json
-msnoise db init
-python 00_check_data.py --min-lon 121.0 --max-lon 122.5 --min-lat 22.0 --max-lat 24.8 --start 2025-01-01 --end 2025-01-02
-bash 01_download_data.sh --csv pre_check_seismic_segments.csv
-python 02_convert_data_sds.py
-python 03_Scan_to_DB.py
+conda run -n msnoise-hm python run_workflow.py
 ```
 
-## Configuration overview
-The `config.json` file contains four main sections:
-- `search_criteria`: data time range, region, FDSN clients, native FDSN selectors (`networks`, `stations`, `locations`, `channels`), and waveform timeout.
-- `seismic_processing`: input/output folders used by `02_convert_data_sds.py`.
-- `data_scan`: paths, station metadata, and filter/global settings used when populating MSNoise tables.
-- `visualization`: file locations and plotting options for CCF and dv/v figures.
+`run_workflow.py` reads `workflow.steps` from `config.json` and runs the selected steps in order.
 
-## Notes and troubleshooting
-- `00_check_data.py` only checks station/channel metadata availability. It does not download waveform data.
-- Some networks reuse station codes at different coordinates or time periods. The pre-check map splits same-code stations with different coordinates into separate markers so relocated stations are not averaged into a misleading location.
-- The pre-check map uses a no-label basemap by default to reduce visual clutter. Use `--basemap osm` for the standard OpenStreetMap labels or `--basemap dark` for a dark no-label map.
-- `01_download_data.sh` is intended to be portable. On another machine, copy `01_download_data.sh` and the pre-check CSV into the same folder, then run the shell script there.
-- If an error occurs while running the MSNoise commands in step 4, delete `msnoise.sqlite` and `db.ini`, then rerun `msnoise db init` before repeating the workflow.
-- If waveform data are already downloaded and converted to SDS, rerun `python 03_Scan_to_DB.py` directly instead of rerunning the download step.
-- Use comma-separated FDSN selectors to limit a run after inspecting the pre-check map. For example, `networks: "TW,9L"` and `stations: "TPUB,THGS"` restrict the station search without changing the code.
-- The SDS-formatted data created by step 3 lives under `seismic_processing.output_folder` (default `SDS`). Update file paths in `config.json` to match your local layout for STACKS/DTT outputs and the MSNoise database.
+## Project Structure
+
+- `config.json` - central configuration for search, download, SDS conversion, MSNoise scan, and dv/v mode.
+- `run_workflow.py` - main entrypoint that runs configured workflow steps.
+- `00_check_data.py` - FDSN station pre-check and interactive HTML map.
+- `01_download_data.sh` - waveform downloader driven by the pre-check CSV and `config.json`.
+- `02_convert_data_sds.py` - converts downloaded MiniSEED files into SDS.
+- `03_Scan_to_DB.py` - updates MSNoise database config, filters, stations, and data availability.
+- `04_hourly_stack_mwcs_dvv.py` - optional hourly stack, MWCS, and dv/v workflow.
+- `config_loader.py` - shared config loader and validator.
+
+## Setup
+
+Install an environment with ObsPy, Folium, pandas, numpy, and MSNoise. For example:
+
+```bash
+conda create -n msnoise-hm -c conda-forge python=3.11 obspy folium pandas numpy msnoise
+conda activate msnoise-hm
+msnoise db init
+```
+
+Choose SQLite and leave the table prefix empty when initializing MSNoise.
+
+## Config-First Usage
+
+Edit `config.json`, then run:
+
+```bash
+conda run -n msnoise-hm python run_workflow.py
+```
+
+Choose steps in:
+
+```json
+"workflow": {
+  "steps": ["precheck", "download", "convert", "scan", "dvv"]
+}
+```
+
+For a quick availability check only:
+
+```json
+"workflow": {
+  "steps": ["precheck"]
+}
+```
+
+You can still run individual scripts, but they now read `config.json` by default:
+
+```bash
+conda run -n msnoise-hm python 00_check_data.py
+bash 01_download_data.sh --dry-run
+conda run -n msnoise-hm python 02_convert_data_sds.py
+conda run -n msnoise-hm python 03_Scan_to_DB.py
+conda run -n msnoise-hm python 04_hourly_stack_mwcs_dvv.py
+```
+
+## Key Config Sections
+
+- `search_criteria`: date range, bounding box, FDSN clients, selectors, restricted metadata flag, and timeout.
+- `precheck`: output CSV/HTML, workers, basemap, and ObsPy routing double-check settings.
+- `download`: input CSV, waveform output directory, timeout, date limits, task limit, and station patterns.
+- `seismic_processing`: raw waveform input folder and SDS output folder.
+- `data_scan`: MSNoise database path, SDS root, filter list, and MSNoise config values such as `analysis_duration`, `keep_all`, `keep_days`, and components.
+- `processing`: dv/v mode selection.
+- `hourly_processing`: hourly stack/MWCS/dv/v paths and runtime options.
+- `visualization`: plotting defaults.
+
+## Station Pre-Check
+
+`00_check_data.py` first queries FDSN station services directly with `curl`. It then optionally runs an ObsPy `RoutingClient` pass to catch networks that route through federation catalogs.
+
+Relevant config:
+
+```json
+"precheck": {
+  "csv": "pre_check_seismic_segments.csv",
+  "output": "pre_check_seismic_data.html",
+  "obspy_double_check": true,
+  "obspy_routers": ["iris-federator", "eida-routing"]
+}
+```
+
+This matters for networks such as `5S`, where the registry routes data through `NOA` even when a simple GFZ/IRIS/ORFEUS station query does not return it.
+
+## Download
+
+`01_download_data.sh` reads `download` from `config.json` and uses the `sources` column from the pre-check CSV to choose dataselect endpoints.
+
+Dry-run the plan without creating output folders:
+
+```bash
+bash 01_download_data.sh --dry-run --limit-tasks 20
+```
+
+Useful config:
+
+```json
+"download": {
+  "csv": "pre_check_seismic_segments.csv",
+  "output_dir": "../Seismic_Data",
+  "date_from": "2020-01-01",
+  "date_to": "2022-12-31",
+  "station_patterns": []
+}
+```
+
+Use `station_patterns`, for example `["5S.R7B57", "5S.R0050"]`, to restrict downloads.
+
+## Daily vs Hourly dv/v
+
+Choose the dv/v mode in `processing.dvv_mode`:
+
+```json
+"processing": {
+  "dvv_mode": "daily"
+}
+```
+
+Allowed values:
+
+- `daily`: run the standard MSNoise daily processing commands.
+- `hourly`: run `04_hourly_stack_mwcs_dvv.py` from existing `CROSS_CORRELATIONS`.
+- `both`: run daily MSNoise processing, then hourly processing.
+
+The hourly workflow expects MSNoise `keep_all=Y` CCF files under `CROSS_CORRELATIONS`. Set:
+
+```json
+"data_scan": {
+  "analysis_duration": 3600,
+  "keep_all": "Y",
+  "keep_days": "Y"
+}
+```
+
+Hourly output settings live in:
+
+```json
+"hourly_processing": {
+  "stage": "all",
+  "cc_root": "CROSS_CORRELATIONS",
+  "stack_root": "HOURLY_STACKS",
+  "mwcs_root": "HOURLY_MWCS",
+  "dvv_root": "HOURLY_DVV",
+  "txt_root": "HOURLY_TXT",
+  "component": "ZZ",
+  "filters": "",
+  "include_all": true,
+  "export_txt": true
+}
+```
+
+## Notes
+
+- `00_check_data.py` checks station/channel metadata only; waveform download is handled by `01_download_data.sh`.
+- If `msnoise.sqlite` or `db.ini` becomes inconsistent, rerun `msnoise db init` before `scan`.
+- `data_scan.sds_root` should be the MSNoise working directory. `seismic_processing.output_folder` is where SDS files are written.
+- Command-line arguments remain available for overrides, but the intended workflow is to edit `config.json` and run `run_workflow.py`.
