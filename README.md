@@ -1,5 +1,7 @@
 # MSNoise Workflow
-HM Huang, 2025
+HM Huang, 2026
+POWERED BY CODEX
+*UNDER DEBUGGING*
 
 This repository is configured around one editable `config.json`. The normal workflow is:
 
