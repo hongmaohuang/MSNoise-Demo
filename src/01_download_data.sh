@@ -58,10 +58,13 @@ done
 
 CONFIG_VALUES="$(python3 - "$CONFIG_PATH" "$CSV_PATH" "$OUTPUT_DIR" "$FAILED_CSV" "$TIMEOUT" "$DATE_FROM" "$DATE_TO" "$LIMIT_TASKS" <<'PY'
 import json
+import os
 import shlex
 import sys
 
 config_path, csv_arg, output_arg, failed_arg, timeout_arg, date_from_arg, date_to_arg, limit_arg = sys.argv[1:9]
+config_path = os.path.abspath(os.path.expanduser(config_path))
+base_dir = os.path.dirname(config_path)
 
 try:
     with open(config_path, "r", encoding="utf-8") as handle:
@@ -80,12 +83,20 @@ def choose(*values):
             return str(value)
     return ""
 
+def resolve(path):
+    if path in (None, ""):
+        return ""
+    path = os.path.expanduser(str(path))
+    if os.path.isabs(path):
+        return os.path.normpath(path)
+    return os.path.normpath(os.path.join(base_dir, path))
+
 def quote(name, value):
     print(f"{name}={shlex.quote(str(value))}")
 
-quote("CSV_PATH", choose(csv_arg, download.get("csv"), precheck.get("csv"), "pre_check_seismic_segments.csv"))
-quote("OUTPUT_DIR", choose(output_arg, download.get("output_dir"), proc.get("source_folder"), "Precheck_Waveforms"))
-quote("FAILED_CSV", choose(failed_arg, download.get("failed_csv"), "failed_precheck_waveform_downloads.csv"))
+quote("CSV_PATH", resolve(choose(csv_arg, download.get("csv"), precheck.get("csv"), "pre_check_seismic_segments.csv")))
+quote("OUTPUT_DIR", resolve(choose(output_arg, download.get("output_dir"), proc.get("source_folder"), "Precheck_Waveforms")))
+quote("FAILED_CSV", resolve(choose(failed_arg, download.get("failed_csv"), "failed_precheck_waveform_downloads.csv")))
 quote("TIMEOUT", choose(timeout_arg, download.get("timeout"), search.get("waveform_timeout"), 60))
 quote("DATE_FROM", choose(date_from_arg, download.get("date_from"), search.get("start_date")))
 quote("DATE_TO", choose(date_to_arg, download.get("date_to"), search.get("end_date")))

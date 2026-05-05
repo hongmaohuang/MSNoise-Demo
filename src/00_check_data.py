@@ -37,10 +37,10 @@ except ImportError as exc:  # pragma: no cover - this is a user-facing guard.
     print(
         f"Missing Python package: {missing}\n\n"
         "Use an environment with ObsPy and Folium, for example:\n"
-        "  conda run -n msnoise-hm python 00_check_data.py\n\n"
+        "  conda run -n msnoise-hm python src/00_check_data.py\n\n"
         "Or create one:\n"
         "  conda create -n seismic-precheck -c conda-forge python=3.11 obspy folium pandas\n"
-        "  conda run -n seismic-precheck python 00_check_data.py",
+        "  conda run -n seismic-precheck python src/00_check_data.py",
         file=sys.stderr,
     )
     raise SystemExit(2)

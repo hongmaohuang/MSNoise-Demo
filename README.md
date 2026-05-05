@@ -13,12 +13,12 @@ conda run -n msnoise-hm python run_workflow.py
 
 - `config.json` - central configuration for search, download, SDS conversion, MSNoise scan, and dv/v mode.
 - `run_workflow.py` - main entrypoint that runs configured workflow steps.
-- `00_check_data.py` - FDSN station pre-check and interactive HTML map.
-- `01_download_data.sh` - waveform downloader driven by the pre-check CSV and `config.json`.
-- `02_convert_data_sds.py` - converts downloaded MiniSEED files into SDS.
-- `03_Scan_to_DB.py` - updates MSNoise database config, filters, stations, and data availability.
-- `04_hourly_stack_mwcs_dvv.py` - optional hourly stack, MWCS, and dv/v workflow.
-- `config_loader.py` - shared config loader and validator.
+- `src/00_check_data.py` - FDSN station pre-check and interactive HTML map.
+- `src/01_download_data.sh` - waveform downloader driven by the pre-check CSV and `config.json`.
+- `src/02_convert_data_sds.py` - converts downloaded MiniSEED files into SDS.
+- `src/03_Scan_to_DB.py` - updates MSNoise database config, filters, stations, and data availability.
+- `src/04_hourly_stack_mwcs_dvv.py` - optional hourly stack, MWCS, and dv/v workflow.
+- `src/config_loader.py` - shared config loader and validator.
 
 ## Setup
 
@@ -59,11 +59,11 @@ For a quick availability check only:
 You can still run individual scripts, but they now read `config.json` by default:
 
 ```bash
-conda run -n msnoise-hm python 00_check_data.py
-bash 01_download_data.sh --dry-run
-conda run -n msnoise-hm python 02_convert_data_sds.py
-conda run -n msnoise-hm python 03_Scan_to_DB.py
-conda run -n msnoise-hm python 04_hourly_stack_mwcs_dvv.py
+conda run -n msnoise-hm python src/00_check_data.py
+bash src/01_download_data.sh --dry-run
+conda run -n msnoise-hm python src/02_convert_data_sds.py
+conda run -n msnoise-hm python src/03_Scan_to_DB.py
+conda run -n msnoise-hm python src/04_hourly_stack_mwcs_dvv.py
 ```
 
 ## Key Config Sections
@@ -101,7 +101,7 @@ This matters for networks such as `5S`, where the registry routes data through `
 Dry-run the plan without creating output folders:
 
 ```bash
-bash 01_download_data.sh --dry-run --limit-tasks 20
+bash src/01_download_data.sh --dry-run --limit-tasks 20
 ```
 
 Useful config:
@@ -109,7 +109,7 @@ Useful config:
 ```json
 "download": {
   "csv": "pre_check_seismic_segments.csv",
-  "output_dir": "../Seismic_Data",
+  "output_dir": "Precheck_Waveforms",
   "date_from": "2020-01-01",
   "date_to": "2022-12-31",
   "station_patterns": []
@@ -131,7 +131,7 @@ Choose the dv/v mode in `processing.dvv_mode`:
 Allowed values:
 
 - `daily`: run the standard MSNoise daily processing commands.
-- `hourly`: run `04_hourly_stack_mwcs_dvv.py` from existing `CROSS_CORRELATIONS`.
+- `hourly`: run `src/04_hourly_stack_mwcs_dvv.py` from existing `CROSS_CORRELATIONS`.
 - `both`: run daily MSNoise processing, then hourly processing.
 
 The hourly workflow expects MSNoise `keep_all=Y` CCF files under `CROSS_CORRELATIONS`. Set:
@@ -163,7 +163,7 @@ Hourly output settings live in:
 
 ## Notes
 
-- `00_check_data.py` checks station/channel metadata only; waveform download is handled by `01_download_data.sh`.
+- `src/00_check_data.py` checks station/channel metadata only; waveform download is handled by `src/01_download_data.sh`.
 - If `msnoise.sqlite` or `db.ini` becomes inconsistent, rerun `msnoise db init` before `scan`.
 - `data_scan.sds_root` should be the MSNoise working directory. `seismic_processing.output_folder` is where SDS files are written.
 - Command-line arguments remain available for overrides, but the intended workflow is to edit `config.json` and run `run_workflow.py`.

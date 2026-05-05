@@ -8,6 +8,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parent
+SRC_DIR = PROJECT_ROOT / "src"
+sys.path.insert(0, str(SRC_DIR))
+
 from config_loader import load_config, validate_config
 
 
@@ -16,7 +20,7 @@ VALID_STEPS = {"precheck", "download", "convert", "scan", "dvv"}
 
 def run_command(command: list[str]) -> None:
     print("\n$ " + " ".join(command))
-    subprocess.run(command, check=True)
+    subprocess.run(command, check=True, cwd=PROJECT_ROOT)
 
 
 def configured_steps(config: dict) -> list[str]:
@@ -58,7 +62,7 @@ def run_dvv(config: dict, config_path: Path, python: str) -> None:
     if mode in {"both", "hourly"}:
         hourly = config.get("hourly_processing", {})
         stage = str(hourly.get("stage", "all"))
-        command = [python, "04_hourly_stack_mwcs_dvv.py", "--config", str(config_path), "--stage", stage]
+        command = [python, str(SRC_DIR / "04_hourly_stack_mwcs_dvv.py"), "--config", str(config_path), "--stage", stage]
         if hourly.get("force", False):
             command.append("--force")
         run_command(command)
@@ -75,6 +79,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     config_path = Path(args.config).expanduser()
+    if not config_path.is_absolute():
+        config_path = PROJECT_ROOT / config_path
     config = load_config(str(config_path))
     validate_config(config)
     steps = [item.strip() for item in args.steps.split(",") if item.strip()] if args.steps else configured_steps(config)
@@ -85,13 +91,13 @@ def main(argv: list[str] | None = None) -> int:
     python = sys.executable
     for step in steps:
         if step == "precheck":
-            run_command([python, "00_check_data.py", "--config", str(config_path)])
+            run_command([python, str(SRC_DIR / "00_check_data.py"), "--config", str(config_path)])
         elif step == "download":
-            run_command(["bash", "01_download_data.sh", "--config", str(config_path)])
+            run_command(["bash", str(SRC_DIR / "01_download_data.sh"), "--config", str(config_path)])
         elif step == "convert":
-            run_command([python, "02_convert_data_sds.py", "--config", str(config_path)])
+            run_command([python, str(SRC_DIR / "02_convert_data_sds.py"), "--config", str(config_path)])
         elif step == "scan":
-            run_command([python, "03_Scan_to_DB.py", "--config", str(config_path)])
+            run_command([python, str(SRC_DIR / "03_Scan_to_DB.py"), "--config", str(config_path)])
         elif step == "dvv":
             run_dvv(config, config_path, python)
     return 0

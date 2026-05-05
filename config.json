@@ -48,7 +48,7 @@
   },
   "download": {
     "csv": "pre_check_seismic_segments.csv",
-    "output_dir": "../Seismic_Data",
+    "output_dir": "Precheck_Waveforms",
     "failed_csv": "failed_precheck_waveform_downloads.csv",
     "timeout": 60,
     "date_from": "2020-01-01",
@@ -80,11 +80,11 @@
     "max_days": ""
   },
   "seismic_processing": {
-    "source_folder": "../Seismic_Data",
+    "source_folder": "Precheck_Waveforms",
     "output_folder": "SDS"
   },
   "data_scan": {
-    "sds_root": "your MSNoise working directory",
+    "sds_root": ".",
     "db_path": "msnoise.sqlite",
     "metadata_csv": "downloaded_stations_metadata.csv",
     "analysis_duration": 3600,

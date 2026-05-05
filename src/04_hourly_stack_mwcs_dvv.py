@@ -41,7 +41,7 @@ CC_ROOT = Path("CROSS_CORRELATIONS")
 STACK_ROOT = Path("HOURLY_STACKS")
 MWCS_ROOT = Path("HOURLY_MWCS")
 DVV_ROOT = Path("HOURLY_DVV")
-TXT_ROOT = Path("/Users/hmhuang/Sth_should_be_local/Iceland/datasets/dvv_results/1_filters_202604_hourly_limit_sta")
+TXT_ROOT = Path("HOURLY_TXT")
 
 
 def optional_value(value):

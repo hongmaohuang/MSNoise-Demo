@@ -1,17 +1,53 @@
 import json
 import os
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, Optional
+
+
+PATH_FIELDS = (
+    ("seismic_processing", "source_folder"),
+    ("seismic_processing", "output_folder"),
+    ("data_scan", "sds_root"),
+    ("data_scan", "db_path"),
+    ("data_scan", "metadata_csv"),
+    ("visualization", "figs_folder"),
+)
+
+
+def resolve_path(path: Optional[str], base_dir: Optional[str] = None) -> Optional[str]:
+    """Resolve a config path relative to the config file directory."""
+    if path in (None, ""):
+        return path
+    text = str(path)
+    if text == "your MSNoise working directory":
+        return text
+    expanded = os.path.expanduser(text)
+    if os.path.isabs(expanded):
+        return os.path.normpath(expanded)
+    root = base_dir or os.getcwd()
+    return os.path.normpath(os.path.join(root, expanded))
+
+
+def normalize_paths(cfg: Dict[str, Any], base_dir: str) -> Dict[str, Any]:
+    for section, key in PATH_FIELDS:
+        section_cfg = cfg.get(section)
+        if isinstance(section_cfg, dict) and key in section_cfg:
+            section_cfg[key] = resolve_path(section_cfg.get(key), base_dir)
+    return cfg
 
 
 def load_config(file_path: str = "config.json") -> Dict[str, Any]:
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Configuration file not found: {file_path}")
+    config_path = os.path.abspath(os.path.expanduser(file_path))
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Configuration file not found: {config_path}")
 
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         try:
-            return json.load(f)
+            cfg = json.load(f)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Invalid JSON in {file_path}: {exc}") from exc
+            raise ValueError(f"Invalid JSON in {config_path}: {exc}") from exc
+    cfg["_config_path"] = config_path
+    cfg["_config_dir"] = os.path.dirname(config_path)
+    return normalize_paths(cfg, cfg["_config_dir"])
 
 
 def _require_keys(cfg: Dict[str, Any], path: str, keys: Iterable[str]) -> None:
